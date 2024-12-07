@@ -1,6 +1,7 @@
+// LoginFrame.java
+
 import javax.swing.*;
 import java.awt.*;
-import java.awt.event.*;
 import java.io.*;
 import java.util.HashMap;
 
@@ -128,7 +129,7 @@ public class LoginFrame extends JFrame {
 
     private void login() {
         String username = usernameField.getText().trim();
-        String password = String.valueOf(passwordField.getPassword()).trim();
+        String password = new String(passwordField.getPassword()).trim();
 
         if (username.isEmpty() || password.isEmpty()) {
             JOptionPane.showMessageDialog(this, "Please enter both username and password.", "Error", JOptionPane.ERROR_MESSAGE);
@@ -191,7 +192,7 @@ public class LoginFrame extends JFrame {
     private void styleButton(JButton button) {
         button.setFocusPainted(false);
         button.setBackground(new Color(100, 100, 100)); // Medium grey
-        button.setForeground(Color.WHITE);
+        button.setForeground(Color.BLACK);
         button.setFont(new Font("SansSerif", Font.BOLD, 14));
         button.setBorder(BorderFactory.createEmptyBorder(5, 15, 5, 15));
         button.setPreferredSize(new Dimension(100, 30));

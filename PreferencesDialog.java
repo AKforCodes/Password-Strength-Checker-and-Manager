@@ -1,6 +1,7 @@
+// PreferencesDialog.java
+
 import javax.swing.*;
 import java.awt.*;
-import java.awt.event.*;
 
 public class PreferencesDialog extends JDialog {
     private JCheckBox lengthCriteriaCheckBox;
@@ -24,7 +25,11 @@ public class PreferencesDialog extends JDialog {
         setLayout(new GridBagLayout());
         GridBagConstraints c = new GridBagConstraints();
 
-        // Password Strength Criteria
+        // Initialize components
+        initializeComponents(c);
+    }
+
+    private void initializeComponents(GridBagConstraints c) {
         JLabel criteriaLabel = new JLabel("Password Strength Criteria:");
         criteriaLabel.setFont(new Font("SansSerif", Font.BOLD, 16));
         criteriaLabel.setForeground(Color.DARK_GRAY);
@@ -83,8 +88,6 @@ public class PreferencesDialog extends JDialog {
         add(saveButton, c);
 
         saveButton.addActionListener(e -> savePreferences());
-
-        setVisible(true);
     }
 
     private void savePreferences() {

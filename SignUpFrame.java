@@ -1,6 +1,7 @@
+// SignUpFrame.java
+
 import javax.swing.*;
 import java.awt.*;
-import java.awt.event.*;
 
 public class SignUpFrame extends JFrame {
     private JTextField usernameField;
@@ -148,8 +149,8 @@ public class SignUpFrame extends JFrame {
 
     private void createAccount() {
         String username = usernameField.getText().trim();
-        String password = String.valueOf(passwordField.getPassword()).trim();
-        String confirmPassword = String.valueOf(confirmPasswordField.getPassword()).trim();
+        String password = new String(passwordField.getPassword()).trim();
+        String confirmPassword = new String(confirmPasswordField.getPassword()).trim();
 
         if (username.isEmpty() || password.isEmpty() || confirmPassword.isEmpty()) {
             JOptionPane.showMessageDialog(this, "Please fill in all fields.", "Error", JOptionPane.ERROR_MESSAGE);
@@ -190,13 +191,13 @@ public class SignUpFrame extends JFrame {
         loginFrame.setVisible(true);
     }
 
-    // Apply styling to buttons
+    // Style method for buttons
     private void styleButton(JButton button) {
         button.setFocusPainted(false);
-        button.setBackground(new Color(100, 100, 100)); // Medium grey
-        button.setForeground(Color.WHITE);
+        button.setBackground(new Color(70, 130, 180)); // Steel Blue for better visibility
+        button.setForeground(Color.BLACK); // White text for contrast
         button.setFont(new Font("SansSerif", Font.BOLD, 14));
-        button.setBorder(BorderFactory.createEmptyBorder(5, 15, 5, 15));
+        button.setBorder(BorderFactory.createLineBorder(new Color(70, 130, 180)));
         button.setPreferredSize(new Dimension(140, 30));
     }
 }

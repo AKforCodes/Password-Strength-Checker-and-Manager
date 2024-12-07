@@ -1,3 +1,5 @@
+// Utils.java
+
 import javax.crypto.*;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.PBEKeySpec;
@@ -10,10 +12,6 @@ public class Utils {
     // Parameters for PBKDF2
     private static final int ITERATIONS = 65536;
     private static final int KEY_LENGTH = 256;
-
-    // AES parameters
-    private static final String AES_ALGORITHM = "AES/CBC/PKCS5Padding";
-    private static final String AES_KEY_ALGORITHM = "AES";
 
     /**
      * Hash the password using PBKDF2 with HMAC SHA-256.
@@ -71,15 +69,22 @@ public class Utils {
      */
     public static String deriveAESKey(String password) {
         try {
-            // Use a fixed salt for simplicity; in production, use a unique salt per user and store it securely
-            byte[] salt = "FixedSaltValue123".getBytes(); // 16 bytes salt
+            // Generate a unique salt for AES key derivation
+            SecureRandom sr = new SecureRandom();
+            byte[] salt = new byte[16];
+            sr.nextBytes(salt);
 
             PBEKeySpec spec = new PBEKeySpec(password.toCharArray(), salt, ITERATIONS, KEY_LENGTH);
             SecretKeyFactory skf = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256");
             byte[] keyBytes = skf.generateSecret(spec).getEncoded();
 
-            // Return Base64 encoded key
-            return Base64.getEncoder().encodeToString(keyBytes);
+            // Combine salt and key
+            byte[] saltAndKey = new byte[salt.length + keyBytes.length];
+            System.arraycopy(salt, 0, saltAndKey, 0, salt.length);
+            System.arraycopy(keyBytes, 0, saltAndKey, salt.length, keyBytes.length);
+
+            // Return as Base64 encoded string
+            return Base64.getEncoder().encodeToString(saltAndKey);
         } catch (NoSuchAlgorithmException | InvalidKeySpecException e) {
             e.printStackTrace();
             return null;
@@ -91,7 +96,12 @@ public class Utils {
      */
     public static String encryptAES(String data, String base64Key) {
         try {
-            byte[] keyBytes = Base64.getDecoder().decode(base64Key);
+            byte[] saltAndKey = Base64.getDecoder().decode(base64Key);
+            byte[] salt = new byte[16];
+            byte[] keyBytes = new byte[32]; // 256 bits
+            System.arraycopy(saltAndKey, 0, salt, 0, 16);
+            System.arraycopy(saltAndKey, 16, keyBytes, 0, 32);
+
             SecretKeySpec keySpec = new SecretKeySpec(keyBytes, "AES");
 
             // Generate IV
@@ -101,10 +111,10 @@ public class Utils {
             IvParameterSpec ivSpec = new IvParameterSpec(iv);
 
             // Initialize Cipher
-            Cipher cipher = Cipher.getInstance(AES_ALGORITHM);
+            Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
             cipher.init(Cipher.ENCRYPT_MODE, keySpec, ivSpec);
 
-            byte[] encrypted = cipher.doFinal(data.getBytes());
+            byte[] encrypted = cipher.doFinal(data.getBytes("UTF-8"));
 
             // Prepend IV to encrypted data
             byte[] encryptedWithIV = new byte[iv.length + encrypted.length];
@@ -113,8 +123,7 @@ public class Utils {
 
             // Return as Base64 string
             return Base64.getEncoder().encodeToString(encryptedWithIV);
-        } catch (NoSuchAlgorithmException | NoSuchPaddingException | InvalidKeyException |
-                 InvalidAlgorithmParameterException | IllegalBlockSizeException | BadPaddingException e) {
+        } catch (Exception e) {
             e.printStackTrace();
             return null;
         }
@@ -125,6 +134,14 @@ public class Utils {
      */
     public static String decryptAES(String encryptedData, String base64Key) {
         try {
+            byte[] saltAndKey = Base64.getDecoder().decode(base64Key);
+            byte[] salt = new byte[16];
+            byte[] keyBytes = new byte[32]; // 256 bits
+            System.arraycopy(saltAndKey, 0, salt, 0, 16);
+            System.arraycopy(saltAndKey, 16, keyBytes, 0, 32);
+
+            SecretKeySpec keySpec = new SecretKeySpec(keyBytes, "AES");
+
             byte[] encryptedWithIV = Base64.getDecoder().decode(encryptedData);
 
             // Extract IV
@@ -136,18 +153,14 @@ public class Utils {
             byte[] encrypted = new byte[encryptedWithIV.length - 16];
             System.arraycopy(encryptedWithIV, 16, encrypted, 0, encrypted.length);
 
-            byte[] keyBytes = Base64.getDecoder().decode(base64Key);
-            SecretKeySpec keySpec = new SecretKeySpec(keyBytes, "AES");
-
             // Initialize Cipher
-            Cipher cipher = Cipher.getInstance(AES_ALGORITHM);
+            Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
             cipher.init(Cipher.DECRYPT_MODE, keySpec, ivSpec);
 
             byte[] decrypted = cipher.doFinal(encrypted);
 
-            return new String(decrypted);
-        } catch (NoSuchAlgorithmException | NoSuchPaddingException | InvalidKeyException |
-                 InvalidAlgorithmParameterException | IllegalBlockSizeException | BadPaddingException e) {
+            return new String(decrypted, "UTF-8");
+        } catch (Exception e) {
             e.printStackTrace();
             return null;
         }

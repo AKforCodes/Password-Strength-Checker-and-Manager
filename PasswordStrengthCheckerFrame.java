@@ -1,3 +1,5 @@
+// PasswordStrengthCheckerFrame.java
+
 import javax.swing.*;
 import java.awt.*;
 
@@ -17,6 +19,7 @@ public class PasswordStrengthCheckerFrame extends JFrame {
         setSize(800, 600);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLocationRelativeTo(null); // Center the frame
+        setLayout(new BorderLayout());
 
         // Initialize panels
         passwordCheckerPanel = new PasswordCheckerPanel();
@@ -30,7 +33,7 @@ public class PasswordStrengthCheckerFrame extends JFrame {
         tabbedPane.addTab("Password Checker", passwordCheckerPanel);
         tabbedPane.addTab("Password Manager", passwordManagerPanel);
 
-        add(tabbedPane);
+        add(tabbedPane, BorderLayout.CENTER);
 
         // Status Bar
         statusBar = new JLabel("Welcome, " + username + "!");

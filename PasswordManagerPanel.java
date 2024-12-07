@@ -1,674 +1,327 @@
-import javax.imageio.ImageIO;
+// PasswordManagerPanel.java
+
 import javax.swing.*;
-import javax.swing.table.TableCellRenderer;
+import javax.swing.table.AbstractTableModel;
+import javax.swing.table.DefaultTableCellRenderer;
 import java.awt.*;
-import java.awt.datatransfer.StringSelection;
-import java.awt.event.*;
-import java.io.*;
 import java.util.ArrayList;
-import java.util.Base64;
-import java.util.Random;
-import javax.crypto.*;
-import javax.crypto.spec.IvParameterSpec;
-import javax.crypto.spec.SecretKeySpec;
-import java.security.*;
+import java.util.List;
+import java.io.*;
 
 public class PasswordManagerPanel extends JPanel {
-    private JTextField pmWebsiteField;
-    private JTextField pmEmailField;
-    private JPasswordField pmPasswordField;
-    private JTable pmPasswordTable;
-    private PasswordTableModel passwordTableModel;
-    private JTextField searchField;
-
-    private String encryptionKey; // User's password used for encryption/decryption
-
-    // File to store password entries
-    private final String PASSWORD_DATA_FILE = "password_entries.dat";
+    private String encryptionPassword;
     private ArrayList<PasswordEntry> passwordEntries;
+    private JTable passwordTable;
+    private PasswordTableModel tableModel;
 
-    // Preferences (Assuming default values for now)
-    private boolean lengthCriteria = true;
-    private boolean uppercaseCriteria = true;
-    private boolean lowercaseCriteria = true;
-    private boolean numberCriteria = true;
-    private boolean specialCharCriteria = true;
+    private final String DATA_FILE = "password_entries.dat";
 
-    public PasswordManagerPanel(String userPassword) {
-        // Derive encryption key from user's password
-        encryptionKey = Utils.deriveAESKey(userPassword);
+    public PasswordManagerPanel(String encryptionPassword) {
+        this.encryptionPassword = encryptionPassword;
+        this.passwordEntries = new ArrayList<>();
 
-        // Initialize password entries
-        passwordEntries = loadPasswordEntries();
-
-        // Initialize components
+        setBackground(new Color(50, 50, 50)); // Dark grey
         setLayout(new BorderLayout());
-        setBackground(Color.WHITE);
 
-        // Initialize components
-        initializeComponents();
+        // Title
+        JLabel titleLabel = new JLabel("Password Manager");
+        titleLabel.setFont(new Font("SansSerif", Font.BOLD, 18));
+        titleLabel.setForeground(Color.WHITE);
+        titleLabel.setHorizontalAlignment(SwingConstants.CENTER);
+        add(titleLabel, BorderLayout.NORTH);
 
-        // Load existing passwords if any
-        loadPasswords();
-    }
+        // Initialize table model and table
+        tableModel = new PasswordTableModel(passwordEntries);
+        passwordTable = new JTable(tableModel);
+        passwordTable.setBackground(new Color(70, 70, 70)); // Slightly lighter grey
+        passwordTable.setForeground(Color.WHITE);
+        passwordTable.setFont(new Font("SansSerif", Font.PLAIN, 14));
+        passwordTable.setGridColor(new Color(90, 90, 90)); // Match the theme
+        passwordTable.getTableHeader().setBackground(new Color(60, 60, 60));
+        passwordTable.getTableHeader().setForeground(Color.BLACK);
+        passwordTable.setRowHeight(30); // Adjust row height if you have logos
 
-    private void initializeComponents() {
-        // Form Panel
-        JPanel formPanel = new JPanel();
-        formPanel.setLayout(new GridBagLayout());
-        formPanel.setBackground(Color.WHITE);
-        GridBagConstraints c = new GridBagConstraints();
+        // Set cell renderer for ImageIcon
+        passwordTable.getColumnModel().getColumn(0).setCellRenderer(new ImageRenderer());
 
-        // Custom font and colors
-        Font font = new Font("SansSerif", Font.PLAIN, 14);
-        Color textColor = Color.DARK_GRAY;
-        Color fieldBackground = new Color(245, 245, 245); // Light grey
-
-        // Website Field
-        JLabel websiteLabel = new JLabel("Website URL:");
-        websiteLabel.setFont(font);
-        websiteLabel.setForeground(textColor);
-        c.gridx = 0;
-        c.gridy = 0;
-        c.insets = new Insets(10, 10, 5, 5);
-        c.anchor = GridBagConstraints.EAST;
-        formPanel.add(websiteLabel, c);
-
-        pmWebsiteField = new JTextField(20);
-        pmWebsiteField.setFont(font);
-        pmWebsiteField.setBackground(fieldBackground);
-        pmWebsiteField.setForeground(textColor);
-        pmWebsiteField.setCaretColor(textColor);
-        pmWebsiteField.setBorder(BorderFactory.createLineBorder(Color.GRAY));
-        pmWebsiteField.setToolTipText("Enter the website URL");
-        c.gridx = 1;
-        c.gridy = 0;
-        c.insets = new Insets(10, 5, 5, 10);
-        c.anchor = GridBagConstraints.WEST;
-        formPanel.add(pmWebsiteField, c);
-
-        // Email/Username Field
-        JLabel emailLabel = new JLabel("Email/Username:");
-        emailLabel.setFont(font);
-        emailLabel.setForeground(textColor);
-        c.gridx = 0;
-        c.gridy = 1;
-        c.insets = new Insets(5, 10, 5, 5);
-        c.anchor = GridBagConstraints.EAST;
-        formPanel.add(emailLabel, c);
-
-        pmEmailField = new JTextField(20);
-        pmEmailField.setFont(font);
-        pmEmailField.setBackground(fieldBackground);
-        pmEmailField.setForeground(textColor);
-        pmEmailField.setCaretColor(textColor);
-        pmEmailField.setBorder(BorderFactory.createLineBorder(Color.GRAY));
-        pmEmailField.setToolTipText("Enter your email or username");
-        c.gridx = 1;
-        c.gridy = 1;
-        c.insets = new Insets(5, 5, 5, 10);
-        c.anchor = GridBagConstraints.WEST;
-        formPanel.add(pmEmailField, c);
-
-        // Password Field
-        JLabel passwordLabel = new JLabel("Password:");
-        passwordLabel.setFont(font);
-        passwordLabel.setForeground(textColor);
-        c.gridx = 0;
-        c.gridy = 2;
-        c.insets = new Insets(5, 10, 5, 5);
-        c.anchor = GridBagConstraints.EAST;
-        formPanel.add(passwordLabel, c);
-
-        pmPasswordField = new JPasswordField(20);
-        pmPasswordField.setFont(font);
-        pmPasswordField.setBackground(fieldBackground);
-        pmPasswordField.setForeground(textColor);
-        pmPasswordField.setCaretColor(textColor);
-        pmPasswordField.setBorder(BorderFactory.createLineBorder(Color.GRAY));
-        pmPasswordField.setToolTipText("Enter the password");
-        c.gridx = 1;
-        c.gridy = 2;
-        c.insets = new Insets(5, 5, 5, 10);
-        c.anchor = GridBagConstraints.WEST;
-        formPanel.add(pmPasswordField, c);
-
-        // Save Button
-        JButton saveButton = new JButton("Save Password");
-        styleButton(saveButton);
-        saveButton.setToolTipText("Click to save the password entry");
-        c.gridx = 1;
-        c.gridy = 3;
-        c.insets = new Insets(10, 5, 10, 10);
-        c.anchor = GridBagConstraints.EAST;
-        formPanel.add(saveButton, c);
-
-        // Search Bar
-        JPanel topPanel = new JPanel(new BorderLayout());
-        topPanel.setBackground(Color.WHITE);
-
-        searchField = new JTextField();
-        searchField.setFont(font);
-        searchField.setBackground(fieldBackground);
-        searchField.setForeground(textColor);
-        searchField.setCaretColor(textColor);
-        searchField.setBorder(BorderFactory.createLineBorder(Color.GRAY));
-        searchField.setPreferredSize(new Dimension(200, 30));
-        searchField.setToolTipText("Search by website or email");
-
-        searchField.addKeyListener(new KeyAdapter() {
-            @Override
-            public void keyReleased(KeyEvent e) {
-                String query = searchField.getText().trim();
-                passwordTableModel.filter(query);
-            }
-        });
-
-        JLabel searchLabel = new JLabel("Search: ");
-        searchLabel.setFont(font);
-        searchLabel.setForeground(Color.DARK_GRAY);
-
-        JPanel searchPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        searchPanel.setBackground(Color.WHITE);
-        searchPanel.add(searchLabel);
-        searchPanel.add(searchField);
-
-        topPanel.add(searchPanel, BorderLayout.NORTH);
-        topPanel.add(formPanel, BorderLayout.SOUTH);
-
-        // Password Table
-        passwordTableModel = new PasswordTableModel();
-        pmPasswordTable = new JTable(passwordTableModel) {
-            @Override
-            public TableCellRenderer getCellRenderer(int row, int column) {
-                if (column == 0) {
-                    return new ImageRenderer();
-                } else {
-                    return super.getCellRenderer(row, column);
-                }
-            }
-        };
-        pmPasswordTable.setRowHeight(32);
-        pmPasswordTable.setBackground(Color.WHITE);
-        pmPasswordTable.setForeground(Color.DARK_GRAY);
-        pmPasswordTable.setSelectionBackground(new Color(230, 230, 250)); // Lavender
-        pmPasswordTable.setSelectionForeground(Color.DARK_GRAY);
-        pmPasswordTable.setGridColor(new Color(211, 211, 211)); // Light Gray
-        pmPasswordTable.setFont(font);
-        pmPasswordTable.getTableHeader().setBackground(new Color(245, 245, 245));
-        pmPasswordTable.getTableHeader().setForeground(Color.DARK_GRAY);
-        pmPasswordTable.getTableHeader().setFont(font);
-        JScrollPane tableScrollPane = new JScrollPane(pmPasswordTable);
-        tableScrollPane.getViewport().setBackground(Color.WHITE);
-        tableScrollPane.setBorder(BorderFactory.createEmptyBorder());
-
-        // Add components to the manager panel
-        add(topPanel, BorderLayout.NORTH);
+        JScrollPane tableScrollPane = new JScrollPane(passwordTable);
         add(tableScrollPane, BorderLayout.CENTER);
 
-        // Add action listener to the Save Password button
-        saveButton.addActionListener(e -> {
-            String website = pmWebsiteField.getText().trim();
-            String email = pmEmailField.getText().trim();
-            String password = String.valueOf(pmPasswordField.getPassword()).trim();
+        // Bottom panel with Add, Import, Export buttons
+        JPanel bottomPanel = new JPanel();
+        bottomPanel.setBackground(new Color(50, 50, 50)); // Match main background
+        bottomPanel.setLayout(new FlowLayout(FlowLayout.RIGHT));
 
-            if (website.isEmpty() || email.isEmpty() || password.isEmpty()) {
-                JOptionPane.showMessageDialog(this, "Please fill in all fields.", "Input Error", JOptionPane.ERROR_MESSAGE);
-                return;
-            }
+        JButton addPasswordButton = new JButton("Add Password");
+        styleButton(addPasswordButton);
+        addPasswordButton.setToolTipText("Add a new password entry");
+        addPasswordButton.addActionListener(e -> addPasswordEntry());
 
-            // Fetch or upload the website logo
-            ImageIcon logo = fetchWebsiteLogo(website);
+        JButton importButton = new JButton("Import Passwords");
+        styleButton(importButton);
+        importButton.setToolTipText("Import password entries from a file");
+        importButton.addActionListener(e -> importPasswords());
 
-            // Encrypt the password
-            String encryptedPassword = Utils.encryptAES(password, encryptionKey);
+        JButton exportButton = new JButton("Export Passwords");
+        styleButton(exportButton);
+        exportButton.setToolTipText("Export password entries to a file");
+        exportButton.addActionListener(e -> exportPasswords());
 
-            if (encryptedPassword == null) {
-                JOptionPane.showMessageDialog(this, "Error encrypting the password.", "Error", JOptionPane.ERROR_MESSAGE);
-                return;
-            }
+        bottomPanel.add(addPasswordButton);
+        bottomPanel.add(importButton);
+        bottomPanel.add(exportButton);
 
-            // Add the entry to the table model
-            PasswordEntry entry = new PasswordEntry(logo, website, email, encryptedPassword);
-            passwordTableModel.addEntry(entry);
+        add(bottomPanel, BorderLayout.SOUTH);
 
-            // Add to password entries list
-            passwordEntries.add(entry);
-            savePasswordEntries();
-
-            // Clear input fields
-            pmWebsiteField.setText("");
-            pmEmailField.setText("");
-            pmPasswordField.setText("");
-        });
-
-        // Add mouse listener for table row interactions
-        pmPasswordTable.addMouseListener(new MouseAdapter() {
-            @Override
-            public void mouseClicked(MouseEvent e) {
-                int row = pmPasswordTable.rowAtPoint(e.getPoint());
-                if (row >= 0 && e.getClickCount() == 2) {
-                    // Show options when a row is double-clicked
-                    showPasswordOptions(row);
-                }
-            }
-        });
+        // Load existing password entries from file
+        loadPasswordEntries();
     }
 
-    /**
-     * Derive a secure AES key from the user's password using PBKDF2.
-     */
-    private String deriveKey(String userPassword) {
-        return Utils.deriveAESKey(userPassword);
-    }
-
-    /**
-     * Fetch the website logo using the Clearbit Logo API.
-     */
-    private ImageIcon fetchWebsiteLogo(String websiteUrl) {
-        try {
-            // Extract the domain from the URL
-            String domain = extractDomain(websiteUrl);
-
-            if (domain == null) {
-                throw new Exception("Invalid URL");
-            }
-
-            // Construct the Clearbit Logo API URL
-            String logoUrl = "https://logo.clearbit.com/" + domain;
-
-            // Fetch the image
-            Image image = ImageIO.read(new java.net.URL(logoUrl));
-            if (image != null) {
-                // Resize the image to fit in the table cell
-                Image scaledImage = image.getScaledInstance(32, 32, Image.SCALE_SMOOTH);
-                return new ImageIcon(scaledImage);
-            }
-        } catch (Exception e) {
-            System.err.println("Error fetching logo for: " + websiteUrl);
-        }
-        // Return a default icon if fetching fails
-        return new ImageIcon("default.png"); // Ensure this path is correct or replace with your default icon path
-    }
-
-    /**
-     * Extract the domain from a URL.
-     */
-    private String extractDomain(String url) throws Exception {
-        if (!url.startsWith("http://") && !url.startsWith("https://")) {
-            url = "http://" + url;
-        }
-        java.net.URL netUrl = new java.net.URL(url);
-        String host = netUrl.getHost();
-        // Remove www. if present
-        if (host.startsWith("www.")) {
-            host = host.substring(4);
-        }
-        return host;
-    }
-
-    /**
-     * Show options to copy or edit the password.
-     */
-    private void showPasswordOptions(int row) {
-        PasswordEntry entry = passwordTableModel.getEntryAt(row);
-
-        JPopupMenu popupMenu = new JPopupMenu();
-
-        JMenuItem copyItem = new JMenuItem("Copy Password");
-        copyItem.addActionListener(e -> {
-            String decryptedPassword = Utils.decryptAES(entry.getPassword(), encryptionKey);
-            StringSelection stringSelection = new StringSelection(decryptedPassword);
-            Toolkit.getDefaultToolkit().getSystemClipboard().setContents(stringSelection, null);
-            new NotificationPopup("Password copied to clipboard!");
-        });
-
-        JMenuItem editItem = new JMenuItem("Edit Entry");
-        editItem.addActionListener(e -> {
-            // Open a dialog to edit the entry
-            editPasswordEntry(entry);
-        });
-
-        popupMenu.add(copyItem);
-        popupMenu.add(editItem);
-
-        // Show the popup menu at the mouse location
-        popupMenu.show(pmPasswordTable, pmPasswordTable.getMousePosition().x, pmPasswordTable.getMousePosition().y);
-    }
-
-    /**
-     * Edit an existing password entry.
-     */
-    private void editPasswordEntry(PasswordEntry entry) {
-        // Create a dialog to edit the entry
-        JDialog dialog = new JDialog((Frame) SwingUtilities.getWindowAncestor(this), "Edit Password Entry", true);
-        dialog.setSize(400, 300);
-        dialog.setLocationRelativeTo(this);
-        dialog.setLayout(new GridBagLayout());
-        GridBagConstraints c = new GridBagConstraints();
-
-        // Custom font
-        Font font = new Font("SansSerif", Font.PLAIN, 14);
-        Color textColor = Color.DARK_GRAY;
-        Color fieldBackground = new Color(245, 245, 245); // Light grey
-
-        // Website Field
-        JLabel websiteLabel = new JLabel("Website URL:");
-        websiteLabel.setFont(font);
-        websiteLabel.setForeground(textColor);
-        c.gridx = 0;
-        c.gridy = 0;
-        c.insets = new Insets(10, 10, 5, 5);
-        c.anchor = GridBagConstraints.EAST;
-        dialog.add(websiteLabel, c);
-
-        JTextField websiteField = new JTextField(entry.getWebsite(), 20);
-        websiteField.setFont(font);
-        websiteField.setBackground(fieldBackground);
-        websiteField.setForeground(textColor);
-        websiteField.setCaretColor(textColor);
-        websiteField.setBorder(BorderFactory.createLineBorder(Color.GRAY));
-        websiteField.setToolTipText("Enter the website URL");
-        c.gridx = 1;
-        c.gridy = 0;
-        c.insets = new Insets(10, 5, 5, 10);
-        c.anchor = GridBagConstraints.WEST;
-        dialog.add(websiteField, c);
-
-        // Email/Username Field
-        JLabel emailLabel = new JLabel("Email/Username:");
-        emailLabel.setFont(font);
-        emailLabel.setForeground(textColor);
-        c.gridx = 0;
-        c.gridy = 1;
-        c.insets = new Insets(5, 10, 5, 5);
-        c.anchor = GridBagConstraints.EAST;
-        dialog.add(emailLabel, c);
-
-        JTextField emailField = new JTextField(entry.getEmail(), 20);
-        emailField.setFont(font);
-        emailField.setBackground(fieldBackground);
-        emailField.setForeground(textColor);
-        emailField.setCaretColor(textColor);
-        emailField.setBorder(BorderFactory.createLineBorder(Color.GRAY));
-        emailField.setToolTipText("Enter your email or username");
-        c.gridx = 1;
-        c.gridy = 1;
-        c.insets = new Insets(5, 5, 5, 10);
-        c.anchor = GridBagConstraints.WEST;
-        dialog.add(emailField, c);
-
-        // Password Field
-        JLabel passwordLabel = new JLabel("Password:");
-        passwordLabel.setFont(font);
-        passwordLabel.setForeground(textColor);
-        c.gridx = 0;
-        c.gridy = 2;
-        c.insets = new Insets(5, 10, 5, 5);
-        c.anchor = GridBagConstraints.EAST;
-        dialog.add(passwordLabel, c);
-
-        JPasswordField passwordField = new JPasswordField(Utils.decryptAES(entry.getPassword(), encryptionKey), 20);
-        passwordField.setFont(font);
-        passwordField.setBackground(fieldBackground);
-        passwordField.setForeground(textColor);
-        passwordField.setCaretColor(textColor);
-        passwordField.setBorder(BorderFactory.createLineBorder(Color.GRAY));
-        passwordField.setToolTipText("Enter the password");
-        c.gridx = 1;
-        c.gridy = 2;
-        c.insets = new Insets(5, 5, 5, 10);
-        c.anchor = GridBagConstraints.WEST;
-        dialog.add(passwordField, c);
-
-        // Save Button
-        JButton saveButton = new JButton("Save Changes");
-        styleButton(saveButton);
-        c.gridx = 1;
-        c.gridy = 3;
-        c.insets = new Insets(10, 5, 10, 10);
-        c.anchor = GridBagConstraints.EAST;
-        dialog.add(saveButton, c);
-
-        // Action listener for Save Button
-        saveButton.addActionListener(e -> {
-            String website = websiteField.getText().trim();
-            String email = emailField.getText().trim();
-            String password = String.valueOf(passwordField.getPassword()).trim();
-
-            if (website.isEmpty() || email.isEmpty() || password.isEmpty()) {
-                JOptionPane.showMessageDialog(dialog, "Please fill in all fields.", "Input Error", JOptionPane.ERROR_MESSAGE);
-                return;
-            }
-
-            // Update the entry
-            entry.setWebsite(website);
-            entry.setEmail(email);
-            String encryptedPassword = Utils.encryptAES(password, encryptionKey);
-            entry.setPassword(encryptedPassword);
-
-            // Update the logo
-            entry.setLogo(fetchWebsiteLogo(website));
-
-            // Refresh the table
-            passwordTableModel.fireTableDataChanged();
-
-            // Save the updated password entries
-            savePasswordEntries();
-
-            dialog.dispose();
-        });
-
-        dialog.setVisible(true);
-    }
-
-    /**
-     * Apply minimalistic styling to buttons.
-     */
     private void styleButton(JButton button) {
         button.setFocusPainted(false);
         button.setBackground(new Color(70, 130, 180)); // Steel Blue
-        button.setForeground(Color.WHITE);
+        button.setForeground(Color.BLACK); // Black text
         button.setFont(new Font("SansSerif", Font.BOLD, 14));
         button.setBorder(BorderFactory.createLineBorder(new Color(70, 130, 180)));
         button.setPreferredSize(new Dimension(160, 30));
     }
 
     /**
-     * Encrypt the password entries before exporting.
+     * Adds a new password entry via a dialog.
      */
-    private String encryptPasswords() throws Exception {
-        // Serialize password data
-        ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        ObjectOutputStream oos = new ObjectOutputStream(baos);
-        oos.writeObject(passwordEntries);
-        oos.close();
+    private void addPasswordEntry() {
+        JTextField websiteField = new JTextField();
+        JTextField emailField = new JTextField();
+        JPasswordField passwordField = new JPasswordField();
+        JButton selectLogoButton = new JButton("Select Logo");
+        JLabel logoPreview = new JLabel();
+        logoPreview.setPreferredSize(new Dimension(50, 50));
+        logoPreview.setBackground(new Color(70, 70, 70)); // Match inner background
+        logoPreview.setOpaque(true);
 
-        // Encrypt using AES
-        return Utils.encryptAES(Base64.getEncoder().encodeToString(baos.toByteArray()), encryptionKey);
-    }
+        // Panel to hold logo selection
+        JPanel logoPanel = new JPanel(new BorderLayout());
+        logoPanel.setBackground(new Color(50, 50, 50)); // Match main background
+        logoPanel.add(selectLogoButton, BorderLayout.NORTH);
+        logoPanel.add(logoPreview, BorderLayout.CENTER);
 
-    /**
-     * Decrypt and load password entries from imported data.
-     */
-    @SuppressWarnings("unchecked")
-    private void decryptAndLoadPasswords(String encryptedData) throws Exception {
-        // Decrypt using AES
-        String decryptedData = Utils.decryptAES(encryptedData, encryptionKey);
+        final ImageIcon[] selectedLogo = {null};
 
-        // Deserialize
-        byte[] dataBytes = Base64.getDecoder().decode(decryptedData);
-        ByteArrayInputStream bais = new ByteArrayInputStream(dataBytes);
-        ObjectInputStream ois = new ObjectInputStream(bais);
-        ArrayList<PasswordEntry> importedEntries = (ArrayList<PasswordEntry>) ois.readObject();
-        ois.close();
+        selectLogoButton.addActionListener(e -> {
+            JFileChooser fileChooser = new JFileChooser();
+            fileChooser.setDialogTitle("Select Logo Image");
+            int userSelection = fileChooser.showOpenDialog(this);
+            if (userSelection == JFileChooser.APPROVE_OPTION) {
+                File selectedFile = fileChooser.getSelectedFile();
+                ImageIcon logoIcon = new ImageIcon(selectedFile.getAbsolutePath());
+                // Resize the icon if necessary
+                Image img = logoIcon.getImage().getScaledInstance(50, 50, Image.SCALE_SMOOTH);
+                logoIcon = new ImageIcon(img);
+                logoPreview.setIcon(logoIcon);
+                logoPreview.setText(null);
+                selectedLogo[0] = logoIcon;
+            }
+        });
 
-        // Add to password entries list and update table
-        for (PasswordEntry entry : importedEntries) {
-            passwordEntries.add(entry);
-            passwordTableModel.addEntry(entry);
+        // Modify the prompt to indicate that Website is optional
+        Object[] message = {
+            "Website (optional):", websiteField,
+            "Email/Username:", emailField,
+            "Password:", passwordField,
+            "Logo:", logoPanel
+        };
+
+        int option = JOptionPane.showConfirmDialog(this, message, "Add Password", JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
+        if (option == JOptionPane.OK_OPTION) {
+            String website = websiteField.getText().trim(); // Now optional
+            String email = emailField.getText().trim();
+            String password = new String(passwordField.getPassword()).trim();
+            ImageIcon logo = selectedLogo[0];
+
+            if (!email.isEmpty() && !password.isEmpty()) { // Removed website from mandatory fields
+                // Encrypt the password
+                String encryptedPassword = Utils.encryptAES(password, Utils.deriveAESKey(encryptionPassword));
+                if (encryptedPassword == null) {
+                    JOptionPane.showMessageDialog(this, "Error encrypting the password.", "Error", JOptionPane.ERROR_MESSAGE);
+                    return;
+                }
+
+                PasswordEntry entry = new PasswordEntry(logo, website, email, encryptedPassword);
+                passwordEntries.add(entry);
+                tableModel.fireTableDataChanged();
+
+                // Save to file
+                savePasswordEntries();
+
+                JOptionPane.showMessageDialog(this, "Password entry added successfully!", "Success", JOptionPane.INFORMATION_MESSAGE);
+            } else {
+                JOptionPane.showMessageDialog(this, "Email and Password fields must be filled.", "Input Error", JOptionPane.ERROR_MESSAGE);
+            }
         }
-
-        // Save the updated password entries
-        savePasswordEntries();
     }
 
     /**
-     * Export passwords to an encrypted file.
+     * Exports the password entries to a file.
      */
     public void exportPasswords() {
         JFileChooser fileChooser = new JFileChooser();
         fileChooser.setDialogTitle("Export Passwords");
         int userSelection = fileChooser.showSaveDialog(this);
+
         if (userSelection == JFileChooser.APPROVE_OPTION) {
             File fileToSave = fileChooser.getSelectedFile();
 
-            try {
-                // Serialize and encrypt the password data
-                String encryptedData = encryptPasswords();
-
-                // Write to file
-                FileWriter fileWriter = new FileWriter(fileToSave);
-                fileWriter.write(encryptedData);
-                fileWriter.close();
-
-                new NotificationPopup("Passwords exported successfully!");
-            } catch (Exception e) {
-                JOptionPane.showMessageDialog(this, "Error exporting passwords.", "Error", JOptionPane.ERROR_MESSAGE);
+            try (ObjectOutputStream oos = new ObjectOutputStream(new FileOutputStream(fileToSave))) {
+                oos.writeObject(passwordEntries);
+                JOptionPane.showMessageDialog(this, "Passwords exported successfully.", "Success", JOptionPane.INFORMATION_MESSAGE);
+            } catch (IOException ex) {
+                JOptionPane.showMessageDialog(this, "Error exporting passwords: " + ex.getMessage(), "Export Error", JOptionPane.ERROR_MESSAGE);
             }
         }
     }
 
     /**
-     * Import passwords from an encrypted file.
+     * Imports password entries from a file.
      */
     public void importPasswords() {
         JFileChooser fileChooser = new JFileChooser();
         fileChooser.setDialogTitle("Import Passwords");
         int userSelection = fileChooser.showOpenDialog(this);
+
         if (userSelection == JFileChooser.APPROVE_OPTION) {
             File fileToOpen = fileChooser.getSelectedFile();
 
-            try {
-                // Read and decrypt the password data
-                BufferedReader reader = new BufferedReader(new FileReader(fileToOpen));
-                String encryptedData = reader.readLine();
-                reader.close();
-
-                decryptAndLoadPasswords(encryptedData);
-
-                new NotificationPopup("Passwords imported successfully!");
-            } catch (Exception e) {
-                JOptionPane.showMessageDialog(this, "Error importing passwords.", "Error", JOptionPane.ERROR_MESSAGE);
+            try (ObjectInputStream ois = new ObjectInputStream(new FileInputStream(fileToOpen))) {
+                Object obj = ois.readObject();
+                if (obj instanceof ArrayList<?>) {
+                    ArrayList<?> importedEntries = (ArrayList<?>) obj;
+                    for (Object entryObj : importedEntries) {
+                        if (entryObj instanceof PasswordEntry) {
+                            passwordEntries.add((PasswordEntry) entryObj);
+                        }
+                    }
+                    tableModel.fireTableDataChanged();
+                    JOptionPane.showMessageDialog(this, "Passwords imported successfully.", "Success", JOptionPane.INFORMATION_MESSAGE);
+                } else {
+                    JOptionPane.showMessageDialog(this, "Invalid file format.", "Import Error", JOptionPane.ERROR_MESSAGE);
+                }
+            } catch (IOException | ClassNotFoundException ex) {
+                JOptionPane.showMessageDialog(this, "Error importing passwords: " + ex.getMessage(), "Import Error", JOptionPane.ERROR_MESSAGE);
             }
         }
     }
 
     /**
-     * Generate a stronger password based on the user's input.
+     * Saves the current password entries to a file.
      */
-    private String generateBetterPassword(String password) {
-        StringBuilder newPassword = new StringBuilder(password);
-        Random random = new Random();
-
-        // Character sets
-        String lower = "abcdefghijklmnopqrstuvwxyz";
-        String upper = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-        String digits = "0123456789";
-        String special = "!@#$%^&*()-+";
-
-        // Flags to check if character types are present
-        boolean hasLower = password.matches(".*[a-z].*");
-        boolean hasUpper = password.matches(".*[A-Z].*");
-        boolean hasDigit = password.matches(".*[0-9].*");
-        boolean hasSpecial = password.matches(".*[!@#$%^&*()-+].*");
-
-        // Load preferences
-        loadPreferences();
-
-        // Add missing character types based on preferences
-        if (!hasLower && lowercaseCriteria) {
-            newPassword.append(lower.charAt(random.nextInt(lower.length())));
+    private void savePasswordEntries() {
+        try (ObjectOutputStream oos = new ObjectOutputStream(new FileOutputStream(DATA_FILE))) {
+            oos.writeObject(passwordEntries);
+        } catch (IOException e) {
+            JOptionPane.showMessageDialog(this, "Error saving password entries.", "Save Error", JOptionPane.ERROR_MESSAGE);
         }
-        if (!hasUpper && uppercaseCriteria) {
-            newPassword.append(upper.charAt(random.nextInt(upper.length())));
-        }
-        if (!hasDigit && numberCriteria) {
-            newPassword.append(digits.charAt(random.nextInt(digits.length())));
-        }
-        if (!hasSpecial && specialCharCriteria) {
-            newPassword.append(special.charAt(random.nextInt(special.length())));
-        }
-
-        // Increase length to at least 8 characters if length criteria is enabled
-        if (lengthCriteria) {
-            while (newPassword.length() < 8) {
-                String allChars = lower + upper + digits + special;
-                newPassword.append(allChars.charAt(random.nextInt(allChars.length())));
-            }
-        }
-
-        // Shuffle the characters in the password
-        char[] passwordChars = newPassword.toString().toCharArray();
-        for (int i = 0; i < passwordChars.length; i++) {
-            int randomIndex = random.nextInt(passwordChars.length);
-            // Swap characters
-            char temp = passwordChars[i];
-            passwordChars[i] = passwordChars[randomIndex];
-            passwordChars[randomIndex] = temp;
-        }
-
-        return new String(passwordChars);
     }
 
     /**
-     * Load user preferences.
+     * Loads password entries from a file.
      */
-    private void loadPreferences() {
-        // TODO: Load preferences from a file or application settings
-        // For now, we'll assume they are all true
-        lengthCriteria = true;
-        uppercaseCriteria = true;
-        lowercaseCriteria = true;
-        numberCriteria = true;
-        specialCharCriteria = true;
-    }
-
-    /**
-     * Load password entries from file.
-     */
-    @SuppressWarnings("unchecked")
-    private ArrayList<PasswordEntry> loadPasswordEntries() {
-        File file = new File(PASSWORD_DATA_FILE);
+    private void loadPasswordEntries() {
+        File file = new File(DATA_FILE);
         if (!file.exists()) {
-            return new ArrayList<>();
+            return; // No existing data to load
         }
 
         try (ObjectInputStream ois = new ObjectInputStream(new FileInputStream(file))) {
-            return (ArrayList<PasswordEntry>) ois.readObject();
+            Object obj = ois.readObject();
+            if (obj instanceof ArrayList<?>) {
+                ArrayList<?> loadedEntries = (ArrayList<?>) obj;
+                for (Object entryObj : loadedEntries) {
+                    if (entryObj instanceof PasswordEntry) {
+                        passwordEntries.add((PasswordEntry) entryObj);
+                    }
+                }
+                tableModel.fireTableDataChanged();
+            }
         } catch (IOException | ClassNotFoundException e) {
-            JOptionPane.showMessageDialog(this, "Error loading password entries.", "Error", JOptionPane.ERROR_MESSAGE);
-            return new ArrayList<>();
+            JOptionPane.showMessageDialog(this, "Error loading password entries.", "Load Error", JOptionPane.ERROR_MESSAGE);
         }
     }
 
     /**
-     * Save password entries to file.
+     * Custom renderer to display ImageIcons in the table.
      */
-    private void savePasswordEntries() {
-        try (ObjectOutputStream oos = new ObjectOutputStream(new FileOutputStream(PASSWORD_DATA_FILE))) {
-            oos.writeObject(passwordEntries);
-        } catch (IOException e) {
-            JOptionPane.showMessageDialog(this, "Error saving password entries.", "Error", JOptionPane.ERROR_MESSAGE);
+    private static class ImageRenderer extends DefaultTableCellRenderer {
+        @Override
+        public Component getTableCellRendererComponent(JTable table, Object value,
+                boolean isSelected, boolean hasFocus, int row, int column) {
+            if (value instanceof ImageIcon) {
+                JLabel label = new JLabel();
+                label.setIcon((ImageIcon) value);
+                label.setHorizontalAlignment(JLabel.CENTER);
+                label.setOpaque(true);
+                label.setBackground(new Color(70, 70, 70)); // Match table background
+                return label;
+            }
+            return super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
         }
     }
 
     /**
-     * Load existing passwords from the entries list.
+     * Table model for the password entries.
      */
-    private void loadPasswords() {
-        for (PasswordEntry entry : passwordEntries) {
-            passwordTableModel.addEntry(entry);
+    private static class PasswordTableModel extends AbstractTableModel {
+        private final String[] columnNames = {"Logo", "Website", "Email", "Password"};
+        private List<PasswordEntry> entries;
+
+        public PasswordTableModel(List<PasswordEntry> entries) {
+            this.entries = entries;
+        }
+
+        @Override
+        public int getRowCount() {
+            return entries.size();
+        }
+
+        @Override
+        public int getColumnCount() {
+            return columnNames.length;
+        }
+
+        @Override
+        public String getColumnName(int columnIndex) {
+            return columnNames[columnIndex];
+        }
+
+        @Override
+        public Object getValueAt(int rowIndex, int columnIndex) {
+            PasswordEntry entry = entries.get(rowIndex);
+            switch (columnIndex) {
+                case 0:
+                    return entry.getLogo();
+                case 1:
+                    return entry.getWebsite();
+                case 2:
+                    return entry.getEmail();
+                case 3:
+                    // Decrypt password if you want to display it; otherwise, keep it masked
+                    // For security, it's better to keep it masked
+                    return "••••••";
+                default:
+                    return null;
+            }
+        }
+
+        @Override
+        public Class<?> getColumnClass(int columnIndex) {
+            if (columnIndex == 0) {
+                return ImageIcon.class;
+            }
+            return String.class;
+        }
+
+        @Override
+        public boolean isCellEditable(int rowIndex, int columnIndex) {
+            return false; // Make table non-editable
         }
     }
 }

@@ -1,3 +1,5 @@
+// PasswordStrengthCheckerApp.java
+
 import javax.swing.*;
 
 public class PasswordStrengthCheckerApp {
